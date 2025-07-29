@@ -18,6 +18,11 @@ export async function POST(req: Request) {
     response = await openAiClient.responses.create({
       model: process.env.OPENAI_MODEL,
       input: [
+        {
+          role: "developer",
+          content:
+            "You are **GeoGuide**, an AI assistant chat-bot that ONLY discusses world-geography.",
+        },
         ...recentHistory,
         {
           role: "user",
