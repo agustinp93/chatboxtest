@@ -2,6 +2,9 @@ export const runtime = "edge";
 // import OpenAI from "openai";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
+/* ------------------------------------------------------------------
+ * Gemini client setup
+ * ----------------------------------------------------------------*/
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_API_MODEL = process.env.GEMINI_API_MODEL || "";
 
@@ -11,11 +14,16 @@ const geminiClient = new ChatGoogleGenerativeAI({
   temperature: 0.5,
 });
 
+/* ------------------------------------------------------------------
+ * OpenAI env validation (keep as-is)
+ * ----------------------------------------------------------------*/
 if (!process.env.OPENAI_KEY || !process.env.OPENAI_MODEL) {
   throw new Error("Missing OPENAI_KEY or OPENAI_MODEL env vars");
 }
 
 const MAX_MESSAGE_LENGTH = 1000;
+
+type ChatMode = "story" | "quiz" | "funfact";
 
 interface ChatHistory {
   role: "user" | "assistant" | "system";
@@ -24,58 +32,100 @@ interface ChatHistory {
 }
 
 interface UserPrefs {
-  country: string;
-  continent: string;
-  destination: string;
+  name?: string;
+  country?: string;
+  continent?: string;
+  destination?: string;
 }
 
 interface RequestBody {
   message: string;
   history: ChatHistory[];
   prefs: UserPrefs;
+  config?: ChatMode; // "story" | "quiz" | "funfact"
 }
 
 // const openAiClient = new OpenAI({
 //   apiKey: process.env.OPENAI_KEY,
 // });
 
-const getGeoGuidePrompt = function getGeoGuidePrompt(prefs: {
-  country: string;
-  continent: string;
-  destination: string;
-}) {
-  return `You are **GeoGuide**, an AI assistant chat-bot that ONLY discusses world-geography.
+const basePersona = `You are **GeoGuide**, an AI assistant chat-bot that ONLY discusses world-geography.`;
 
-      - Output rules
+const baseOutputRules = ` - Output rules
         1. Reply in plain text - no Markdown, HTML or code-blocks.
-        2. Be concise (≈ 2-4 sentences) yet informative; avoid answers that force the user to scroll.
+        2. Be concise; avoid answers that force the user to scroll.
         3. Maintain a neutral, polite and friendly tone. Never insult or use rude language.
-        4. If a user asks about anything *not* related to geography, respond with:
-          "I'm sorry, I can only discuss geography-related topics."
+        4. If asked about topics unrelated to geography, respond with: "I'm sorry, I can only discuss geography-related topics."
 
-      - Conversation goals
-        • Give clear, accurate answers to geography questions.
-        • Proactively keep the chat lively by suggesting related geography facts or questions.
-        • Personalise content using the stored preferences below whenever relevant.
+        If you receive a message that says "Greet the user", please use it a the conversation starter and start as if the conversation is new.
+        
+        Max length response: ${MAX_MESSAGE_LENGTH} characters.`;
 
-      ✦ User preferences
-        • Favourite country: ${prefs.country || "-"}
-        • Favourite continent: ${prefs.continent || "-"}
-        • Favourite destination: ${prefs.destination || "-"}
-      If any of the user preferences is not present, please ask the user for more information. 
+function formatPrefs(prefs: UserPrefs): string {
+  return `- User preferences  
+    • Name: ${prefs.name || "-"}  
+    • Favourite country: ${prefs.country || "-"}  
+    • Favourite continent: ${prefs.continent || "-"}  
+    • Favourite destination: ${prefs.destination || "-"}`;
+}
 
-      Max lenght response: ${MAX_MESSAGE_LENGTH} characters.
-    `.trim();
-};
+function storyPrompt(prefs: UserPrefs) {
+  return `${basePersona}
+
+      Your role now is a lively *story-teller*. Weave short, vivid narratives (≈ 5 sentences) that transport the user to their favourite places while remaining factual. 
+      Always ground stories in real geography. End each answer with an open question to keep the conversation flowing.${formatPrefs(
+        prefs
+      )}
+
+      ${baseOutputRules}`;
+}
+
+function quizPrompt(prefs: UserPrefs) {
+  return `${basePersona}
+
+      Your role now is an *interactive quiz master*. Ask the user one multiple-choice question at a time about world geography, prioritising their preferred places. Wait for the user's reply before revealing the answer and moving to the next question. Keep each question + options within two sentences.${formatPrefs(
+        prefs
+      )}
+
+      ${baseOutputRules}`;
+}
+
+function funFactPrompt(prefs: UserPrefs) {
+  return `${basePersona}
+
+      Your role now is to share one *fun geography fact* per message, preferably related to the user's favourite places. Keep it to 2-3 sentences and conclude with a playful prompt encouraging further chat.${formatPrefs(
+        prefs
+      )}
+      
+      ${baseOutputRules}`;
+}
+
+function defaultPrompt(prefs: UserPrefs) {
+  return `${basePersona}
+
+        ${baseOutputRules}
+
+        ${formatPrefs(prefs)}\n\n      `;
+}
+
+function buildSystemPrompt(mode: ChatMode | undefined, prefs: UserPrefs) {
+  switch (mode) {
+    case "story":
+      return storyPrompt(prefs);
+    case "quiz":
+      return quizPrompt(prefs);
+    case "funfact":
+      return funFactPrompt(prefs);
+    default:
+      return defaultPrompt(prefs);
+  }
+}
 
 function isValidRequest(body: unknown): body is RequestBody {
-  if (!body || typeof body !== "object") {
-    return false;
-  }
+  if (!body || typeof body !== "object") return false;
+  const { message, history, prefs, config } = body as RequestBody;
 
-  const { message, history, prefs } = body as RequestBody;
-
-  // Validate message
+  // Message
   if (
     typeof message !== "string" ||
     message.trim().length === 0 ||
@@ -84,7 +134,7 @@ function isValidRequest(body: unknown): body is RequestBody {
     return false;
   }
 
-  // Validate history
+  // History
   if (
     !Array.isArray(history) ||
     history.some(
@@ -98,17 +148,20 @@ function isValidRequest(body: unknown): body is RequestBody {
     return false;
   }
 
-  // Validate prefs
-  if (!prefs || typeof prefs !== "object") {
-    return false;
-  }
+  if (!prefs || typeof prefs !== "object") return false;
 
-  const { country, continent, destination } = prefs;
+  const { name, country, continent, destination } = prefs;
   if (
+    (name !== undefined && typeof name !== "string") ||
     (country !== undefined && typeof country !== "string") ||
     (continent !== undefined && typeof continent !== "string") ||
     (destination !== undefined && typeof destination !== "string")
   ) {
+    return false;
+  }
+
+  const allowedModes = ["story", "quiz", "funfact"] as const;
+  if (config !== undefined && !allowedModes.includes(config as ChatMode)) {
     return false;
   }
 
@@ -127,7 +180,7 @@ export async function POST(req: Request) {
     return new Response("Invalid request body", { status: 400 });
   }
 
-  const { message, history, prefs } = body;
+  const { message, history, prefs, config } = body as RequestBody;
 
   const recentHistory = history.slice(-10);
 
@@ -138,7 +191,7 @@ export async function POST(req: Request) {
     //   input: [
     //     {
     //       role: "developer",
-    //       content: getGeoGuidePrompt(prefs),
+    //       content: buildSystemPrompt(config, prefs),
     //     },
     //     ...recentHistory,
     //     {
@@ -148,7 +201,6 @@ export async function POST(req: Request) {
     //   ],
     // });
 
-    // Map ChatHistory to BaseMessageLike format
     const formattedHistory = recentHistory
       .filter((item) => item.role === "user" || item.role === "assistant")
       .map((item) => ({
@@ -159,7 +211,7 @@ export async function POST(req: Request) {
     response = await geminiClient.invoke([
       {
         role: "system",
-        content: getGeoGuidePrompt(prefs),
+        content: buildSystemPrompt(config, prefs),
       },
       ...formattedHistory,
       {
@@ -172,7 +224,9 @@ export async function POST(req: Request) {
     return new Response(msg, { status: 502 });
   }
 
-  // Handle response.content to ensure it's a string
+  /* ----------------------------------------------------------------
+   * Normalise Gemini response
+   * --------------------------------------------------------------*/
   let assistantResponse: string;
   if (typeof response.content === "string") {
     assistantResponse = response.content;

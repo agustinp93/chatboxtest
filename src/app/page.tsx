@@ -1,9 +1,38 @@
 "use client";
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Loader2, Pencil } from "lucide-react";
+import { Loader2, Pencil, BookOpen, HelpCircle, Sparkles } from "lucide-react";
 
 type Message = { role: "user" | "assistant"; content: string };
-type Prefs = { country: string; continent: string; destination: string };
+
+type Prefs = {
+  name: string;
+  country: string;
+  continent: string;
+  destination: string;
+};
+
+const MODES = [
+  {
+    key: "story" as const,
+    label: "Story‑telling",
+    icon: BookOpen,
+    blurb: "Narrative journeys through your favourite places.",
+  },
+  {
+    key: "quiz" as const,
+    label: "Mini Quiz",
+    icon: HelpCircle,
+    blurb: "Quick interactive trivia about your preferences.",
+  },
+  {
+    key: "funfact" as const,
+    label: "Fun Facts",
+    icon: Sparkles,
+    blurb: "Bite‑sized curiosities to brighten the chat.",
+  },
+];
+
+type ModeKey = (typeof MODES)[number]["key"];
 
 const MAX_INPUT_LENGTH = 200;
 
@@ -15,15 +44,22 @@ export default function Home() {
 
   const [showPrefs, setShowPrefs] = useState(true);
   const [prefs, setPrefs] = useState<Prefs>({
+    name: "",
     country: "",
     continent: "",
     destination: "",
   });
+  const [mode, setMode] = useState<ModeKey | "">("");
 
-  const prefsComplete = useMemo(
-    () => prefs.country && prefs.continent && prefs.destination,
-    [prefs]
-  );
+  const onboardingComplete = useMemo(() => {
+    return (
+      prefs.name &&
+      prefs.country &&
+      prefs.continent &&
+      prefs.destination &&
+      !!mode
+    );
+  }, [prefs, mode]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -45,16 +81,12 @@ export default function Home() {
           message: userMessage.content,
           history: messages.slice(-10),
           prefs,
+          config: mode,
         }),
       });
 
-      if (!res.ok) {
-        throw new Error(`API error: ${res.status}`);
-      }
-
-      if (!res.body) {
-        throw new Error("No response body");
-      }
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      if (!res.body) throw new Error("No response body");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -85,23 +117,34 @@ export default function Home() {
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.value.length <= MAX_INPUT_LENGTH) {
-      setInput(lettersOnly(e.target.value));
-    }
-  };
+  const lettersOnly = (s: string) =>
+    s.replace(/[^A-Za-z.,\-\s\?\'\"0-9]/g, "").slice(0, MAX_INPUT_LENGTH);
 
-  const lettersOnly = (s: string) => s.replace(/[^A-Za-z.,-\s\?\'\"0-9]/g, "");
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(lettersOnly(e.target.value));
+  };
 
   const handlePrefsChange =
     (key: keyof Prefs) => (e: React.ChangeEvent<HTMLInputElement>) =>
       setPrefs((p) => ({ ...p, [key]: lettersOnly(e.target.value) }));
 
-  if (showPrefs || !prefsComplete) {
+  /* ------------------------------------------------------------------
+   * Render onboarding overlay
+   * ----------------------------------------------------------------*/
+  if (showPrefs || !onboardingComplete) {
     return (
-      <div className="fixed bottom-6 right-6 w-80 rounded-lg shadow-lg border bg-white dark:bg-gray-900 p-4 space-y-3 text-sm">
-        <h2 className="font-medium">Tell us a bit about you</h2>
+      <div className="fixed bottom-6 right-6 w-80 rounded-xl shadow-lg border bg-white dark:bg-gray-900 p-4 space-y-4 text-sm">
+        <h2 className="font-semibold text-base">
+          Welcome! Let&rsquo;s personalise your chat
+        </h2>
 
+        <input
+          placeholder="Your name"
+          className="w-full border rounded p-2"
+          value={prefs.name}
+          onChange={handlePrefsChange("name")}
+          disabled={loading}
+        />
         <input
           placeholder="Favourite country"
           className="w-full border rounded p-2"
@@ -121,16 +164,44 @@ export default function Home() {
           className="w-full border rounded p-2"
           value={prefs.destination}
           onChange={handlePrefsChange("destination")}
-          onKeyDown={(e) => e.key === "Enter" && setShowPrefs(false)}
           disabled={loading}
+          onKeyDown={(e) =>
+            e.key === "Enter" && onboardingComplete && setShowPrefs(false)
+          }
         />
 
+        {/* Creative mode picker */}
+        <div className="pt-2">
+          <p className="mb-1 font-medium">Choose your vibe:</p>
+          <div className="grid grid-cols-3 gap-2">
+            {MODES.map(({ key, label, icon: Icon, blurb }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setMode(key)}
+                disabled={loading}
+                className={`flex flex-col items-center justify-center gap-1 rounded-md border p-2 text-center transition hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                  mode === key
+                    ? "ring-2 ring-blue-500 border-blue-500"
+                    : "border-gray-300 dark:border-gray-700"
+                }`}
+                title={blurb}
+              >
+                <Icon size={20} className="stroke-2" />
+                <span className="text-xs font-medium leading-tight">
+                  {label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <button
-          disabled={!prefsComplete}
+          disabled={!onboardingComplete || loading}
           className="w-full py-2 rounded bg-blue-600 text-white disabled:opacity-50"
           onClick={() => !loading && setShowPrefs(false)}
         >
-          Start chatting
+          Let&rsquo;s chat!
         </button>
       </div>
     );
@@ -139,7 +210,12 @@ export default function Home() {
   return (
     <div className="fixed bottom-6 right-6 w-80 h-96 flex flex-col rounded-lg shadow-lg border bg-white dark:bg-gray-900">
       <div className="flex items-center justify-between px-3 py-2 border-b">
-        <span className="text-sm font-medium">Geo-Chat</span>
+        <span className="text-sm font-medium">
+          Geo‑Chat{" "}
+          <span className="opacity-60">
+            • {MODES.find((m) => m.key === mode)?.label}
+          </span>
+        </span>
         <button
           onClick={() => setShowPrefs(true)}
           disabled={loading}
@@ -154,17 +230,18 @@ export default function Home() {
         {messages.map((m, i) => (
           <div
             key={i}
-            className={`max-w-[75%] break-words ${
-              i % 2 === 0
+            className={`max-w-[75%] break-words rounded-md px-3 py-1 ${
+              m.role === "user"
                 ? "self-end bg-blue-600 text-white"
                 : "self-start bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-50"
-            } rounded-md px-3 py-1`}
+            }`}
           >
             {m.content}
           </div>
         ))}
         <div ref={endRef} />
       </div>
+
       <div className="p-3 flex gap-2">
         <input
           value={input}
