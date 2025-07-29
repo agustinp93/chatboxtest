@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Pencil } from "lucide-react";
+import { Loader2, Pencil } from "lucide-react";
 
 type Message = { role: "user" | "assistant"; content: string };
 type Prefs = { country: string; continent: string; destination: string };
@@ -11,6 +11,7 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(false);
 
   const [showPrefs, setShowPrefs] = useState(true);
   const [prefs, setPrefs] = useState<Prefs>({
@@ -29,10 +30,12 @@ export default function Home() {
   }, [messages]);
 
   async function send() {
-    if (!input.trim()) return;
+    if (!input.trim() || loading) return;
+
     const userMessage: Message = { role: "user", content: input.trim() };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setLoading(true);
 
     try {
       const res = await fetch("/api/stream", {
@@ -77,6 +80,8 @@ export default function Home() {
           content: "Sorry, something went wrong. Please try again.",
         },
       ]);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -102,12 +107,14 @@ export default function Home() {
           className="w-full border rounded p-2"
           value={prefs.country}
           onChange={handlePrefsChange("country")}
+          disabled={loading}
         />
         <input
           placeholder="Favourite continent"
           className="w-full border rounded p-2"
           value={prefs.continent}
           onChange={handlePrefsChange("continent")}
+          disabled={loading}
         />
         <input
           placeholder="Favourite destination"
@@ -115,12 +122,13 @@ export default function Home() {
           value={prefs.destination}
           onChange={handlePrefsChange("destination")}
           onKeyDown={(e) => e.key === "Enter" && setShowPrefs(false)}
+          disabled={loading}
         />
 
         <button
           disabled={!prefsComplete}
           className="w-full py-2 rounded bg-blue-600 text-white disabled:opacity-50"
-          onClick={() => setShowPrefs(false)}
+          onClick={() => !loading && setShowPrefs(false)}
         >
           Start chatting
         </button>
@@ -134,6 +142,7 @@ export default function Home() {
         <span className="text-sm font-medium">Geo-Chat</span>
         <button
           onClick={() => setShowPrefs(true)}
+          disabled={loading}
           className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
           title="Edit preferences"
         >
@@ -163,12 +172,15 @@ export default function Home() {
           onKeyDown={(e) => e.key === "Enter" && send()}
           className="flex-1 rounded-md border px-2 py-1 text-sm bg-transparent outline-none"
           placeholder="Type a message"
+          disabled={loading}
         />
         <button
           onClick={send}
+          disabled={loading || !input.trim()}
           className="px-3 py-1 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700"
         >
-          Send
+          {loading && <Loader2 size={16} className="animate-spin" />}
+          <span>{loading ? "" : "Send"}</span>
         </button>
       </div>
     </div>
