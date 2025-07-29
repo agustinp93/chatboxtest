@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
+import { Pencil } from "lucide-react";
 
 type Message = { role: "user" | "assistant"; content: string };
 type Prefs = { country: string; continent: string; destination: string };
@@ -97,6 +98,17 @@ export default function Home() {
 
   return (
     <div className="fixed bottom-6 right-6 w-80 h-96 flex flex-col rounded-lg shadow-lg border bg-white dark:bg-gray-900">
+      <div className="flex items-center justify-between px-3 py-2 border-b">
+        <span className="text-sm font-medium">Geo-Chat</span>
+        <button
+          onClick={() => setShowPrefs(true)}
+          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+          title="Edit preferences"
+        >
+          <Pencil size={16} className="stroke-2" />
+        </button>
+      </div>
+
       <div className="flex-1 p-3 overflow-y-auto space-y-2 text-sm">
         {messages.map((m, i) => (
           <div
