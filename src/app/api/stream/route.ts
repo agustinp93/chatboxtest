@@ -68,11 +68,9 @@ export async function POST(req: Request) {
 
   const stream = new ReadableStream({
     async start(controller) {
-      console.log(`Received message: ${message}`);
-      // const text = `Echo: ${message}`;
       for (const ch of assistantResponse) {
         controller.enqueue(encoder.encode(ch));
-        await new Promise((r) => setTimeout(r, 50));
+        await new Promise((r) => setTimeout(r, 25));
       }
       controller.close();
     },
