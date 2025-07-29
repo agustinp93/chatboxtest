@@ -2,11 +2,20 @@
 import { useState, useRef, useEffect } from "react";
 
 type Message = { role: "user" | "assistant"; content: string };
+type Prefs = { country: string; continent: string; destination: string };
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+
+  const [showPrefs, setShowPrefs] = useState(true);
+  const [prefs, setPrefs] = useState<Prefs>({
+    country: "",
+    continent: "",
+    destination: "",
+  });
+  const prefsComplete = prefs.country && prefs.continent && prefs.destination;
 
   useEffect(() => {
     endRef.current?.scrollIntoView();
@@ -24,6 +33,7 @@ export default function Home() {
       body: JSON.stringify({
         message: userMessage.content,
         history: messages.slice(-10),
+        prefs,
       }),
     });
 
@@ -43,6 +53,46 @@ export default function Home() {
         return copy;
       });
     }
+  }
+
+  if (showPrefs || !prefsComplete) {
+    return (
+      <div className="fixed bottom-6 right-6 w-80 rounded-lg shadow-lg border bg-white dark:bg-gray-900 p-4 space-y-3 text-sm">
+        <h2 className="font-medium">Tell us a bit about you</h2>
+
+        <input
+          placeholder="Favourite country"
+          className="w-full border rounded p-2"
+          value={prefs.country}
+          onChange={(e) => setPrefs((p) => ({ ...p, country: e.target.value }))}
+        />
+        <input
+          placeholder="Favourite continent"
+          className="w-full border rounded p-2"
+          value={prefs.continent}
+          onChange={(e) =>
+            setPrefs((p) => ({ ...p, continent: e.target.value }))
+          }
+        />
+        <input
+          placeholder="Favourite destination"
+          className="w-full border rounded p-2"
+          value={prefs.destination}
+          onChange={(e) =>
+            setPrefs((p) => ({ ...p, destination: e.target.value }))
+          }
+        />
+
+        <button
+          disabled={!prefsComplete}
+          className="w-full py-2 rounded bg-blue-600 text-white disabled:opacity-50"
+          onClick={() => setShowPrefs(false)}
+          onKeyDown={(e) => e.key === "Enter" && setShowPrefs(false)}
+        >
+          Start chatting
+        </button>
+      </div>
+    );
   }
 
   return (

@@ -5,25 +5,38 @@ const openAiClient = new OpenAI({
   apiKey: process.env.OPENAI_KEY,
 });
 
-const systemPrompt = `
-      You are **GeoGuide**, an AI assistant chat-bot that ONLY discusses world-geography.
+const getGeoGuidePrompt = function getGeoGuidePrompt(prefs: {
+  country: string;
+  continent: string;
+  destination: string;
+}) {
+  return `You are **GeoGuide**, an AI assistant chat-bot that ONLY discusses world-geography.
 
       - Output rules
-      1. Reply in plain text - no Markdown, HTML or code-blocks.
-      2. Be concise (≈ 2-4 sentences) yet informative; avoid answers that force the user to scroll.
-      3. Maintain a neutral, polite and friendly tone. Never insult or use rude language.
-      4. If a user asks about anything *not* related to geography, respond with:
-        "I'm sorry, I can only discuss geography-related topics."
+        1. Reply in plain text - no Markdown, HTML or code-blocks.
+        2. Be concise (≈ 2-4 sentences) yet informative; avoid answers that force the user to scroll.
+        3. Maintain a neutral, polite and friendly tone. Never insult or use rude language.
+        4. If a user asks about anything *not* related to geography, respond with:
+          "I'm sorry, I can only discuss geography-related topics."
 
       - Conversation goals
-      • Give clear, accurate answers to geography questions.
-      • Proactively keep the chat lively by suggesting related geography facts or questions.
+        • Give clear, accurate answers to geography questions.
+        • Proactively keep the chat lively by suggesting related geography facts or questions.
+        • Personalise content using the stored preferences below whenever relevant.
+
+      ✦ User preferences
+        • Favourite country: ${prefs.country || "-"}
+        • Favourite continent: ${prefs.continent || "-"}
+        • Favourite destination: ${prefs.destination || "-"}
+      If any of the user preferences is not present, please ask the user for more information.
     `.trim();
+};
 
 export async function POST(req: Request) {
-  const { message, history } = (await req.json()) as {
+  const { message, history, prefs } = (await req.json()) as {
     message: string;
     history: { role: "user" | "assistant"; content: string }[];
+    prefs: { country: string; continent: string; destination: string };
   };
 
   const recentHistory = history.slice(-10);
@@ -35,7 +48,7 @@ export async function POST(req: Request) {
       input: [
         {
           role: "developer",
-          content: systemPrompt,
+          content: getGeoGuidePrompt(prefs),
         },
         ...recentHistory,
         {
