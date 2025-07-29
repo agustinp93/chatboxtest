@@ -1,9 +1,11 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Pencil } from "lucide-react";
 
 type Message = { role: "user" | "assistant"; content: string };
 type Prefs = { country: string; continent: string; destination: string };
+
+const MAX_INPUT_LENGTH = 200;
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -16,10 +18,14 @@ export default function Home() {
     continent: "",
     destination: "",
   });
-  const prefsComplete = prefs.country && prefs.continent && prefs.destination;
+
+  const prefsComplete = useMemo(
+    () => prefs.country && prefs.continent && prefs.destination,
+    [prefs]
+  );
 
   useEffect(() => {
-    endRef.current?.scrollIntoView();
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   async function send() {
@@ -28,33 +34,57 @@ export default function Home() {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
 
-    const res = await fetch("/api/stream", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: userMessage.content,
-        history: messages.slice(-10),
-        prefs,
-      }),
-    });
-
-    if (!res.body) return;
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let aiAssistant = "";
-    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      aiAssistant += decoder.decode(value);
-      setMessages((prev) => {
-        const copy = [...prev];
-        copy[copy.length - 1] = { role: "assistant", content: aiAssistant };
-        return copy;
+    try {
+      const res = await fetch("/api/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: userMessage.content,
+          history: messages.slice(-10),
+          prefs,
+        }),
       });
+
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
+      }
+
+      if (!res.body) {
+        throw new Error("No response body");
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let aiAssistant = "";
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        aiAssistant += decoder.decode(value);
+        setMessages((prev) => {
+          const copy = [...prev];
+          copy[copy.length - 1] = { role: "assistant", content: aiAssistant };
+          return copy;
+        });
+      }
+    } catch (error) {
+      console.error(error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Sorry, something went wrong. Please try again.",
+        },
+      ]);
     }
   }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.value.length <= MAX_INPUT_LENGTH) {
+      setInput(e.target.value);
+    }
+  };
 
   const lettersOnly = (s: string) => s.replace(/[^A-Za-z]/g, "");
 
@@ -129,7 +159,7 @@ export default function Home() {
       <div className="p-3 flex gap-2">
         <input
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={(e) => e.key === "Enter" && send()}
           className="flex-1 rounded-md border px-2 py-1 text-sm bg-transparent outline-none"
           placeholder="Type a message"
