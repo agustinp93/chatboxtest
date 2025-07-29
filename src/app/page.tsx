@@ -1,39 +1,41 @@
-'use client'
-import { useState, useRef, useEffect } from 'react'
+"use client";
+import { useState, useRef, useEffect } from "react";
 
 export default function Home() {
-  const [messages, setMessages] = useState<string[]>([])
-  const [input, setInput] = useState('')
-  const endRef = useRef<HTMLDivElement>(null)
+  const [messages, setMessages] = useState<string[]>([]);
+  const [input, setInput] = useState("");
+  const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { endRef.current?.scrollIntoView() }, [messages])
+  useEffect(() => {
+    endRef.current?.scrollIntoView();
+  }, [messages]);
 
   async function send() {
-    if (!input.trim()) return
-    const user = input.trim()
-    setMessages(prev => [...prev, user])
-    setInput('')
+    if (!input.trim()) return;
+    const user = input.trim();
+    setMessages((prev) => [...prev, user]);
+    setInput("");
 
-    const res = await fetch('/api/stream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: user })
-    })
+    const res = await fetch("/api/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: user }),
+    });
 
-    if (!res.body) return
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder()
-    let ai = ''
-    setMessages(prev => [...prev, ''])
+    if (!res.body) return;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let ai = "";
+    setMessages((prev) => [...prev, ""]);
     for (;;) {
-      const { value, done } = await reader.read()
-      if (done) break
-      ai += decoder.decode(value)
-      setMessages(prev => {
-        const copy = [...prev]
-        copy[copy.length - 1] = ai
-        return copy
-      })
+      const { value, done } = await reader.read();
+      if (done) break;
+      ai += decoder.decode(value);
+      setMessages((prev) => {
+        const copy = [...prev];
+        copy[copy.length - 1] = ai;
+        return copy;
+      });
     }
   }
 
@@ -43,7 +45,11 @@ export default function Home() {
         {messages.map((m, i) => (
           <div
             key={i}
-            className={`max-w-[75%] break-words ${i % 2 === 0 ? 'self-end bg-blue-600 text-white' : 'self-start bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-50'} rounded-md px-3 py-1`}
+            className={`max-w-[75%] break-words ${
+              i % 2 === 0
+                ? "self-end bg-blue-600 text-white"
+                : "self-start bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-50"
+            } rounded-md px-3 py-1`}
           >
             {m}
           </div>
@@ -53,8 +59,8 @@ export default function Home() {
       <div className="p-3 flex gap-2">
         <input
           value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && send()}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && send()}
           className="flex-1 rounded-md border px-2 py-1 text-sm bg-transparent outline-none"
           placeholder="Type a message"
         />
@@ -66,5 +72,5 @@ export default function Home() {
         </button>
       </div>
     </div>
-  )
+  );
 }
