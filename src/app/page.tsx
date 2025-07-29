@@ -1,8 +1,10 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 
+type Message = { role: "user" | "assistant"; content: string };
+
 export default function Home() {
-  const [messages, setMessages] = useState<string[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -12,28 +14,32 @@ export default function Home() {
 
   async function send() {
     if (!input.trim()) return;
-    const user = input.trim();
-    setMessages((prev) => [...prev, user]);
+    const userMessage: Message = { role: "user", content: input.trim() };
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
 
     const res = await fetch("/api/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: user }),
+      body: JSON.stringify({
+        message: userMessage.content,
+        history: messages.slice(-10),
+      }),
     });
 
     if (!res.body) return;
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
-    let ai = "";
-    setMessages((prev) => [...prev, ""]);
+    let aiAssistant = "";
+    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
     for (;;) {
       const { value, done } = await reader.read();
       if (done) break;
-      ai += decoder.decode(value);
+      aiAssistant += decoder.decode(value);
       setMessages((prev) => {
         const copy = [...prev];
-        copy[copy.length - 1] = ai;
+        copy[copy.length - 1] = { role: "assistant", content: aiAssistant };
         return copy;
       });
     }
@@ -51,7 +57,7 @@ export default function Home() {
                 : "self-start bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-50"
             } rounded-md px-3 py-1`}
           >
-            {m}
+            {m.content}
           </div>
         ))}
         <div ref={endRef} />

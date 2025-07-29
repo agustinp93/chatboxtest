@@ -6,13 +6,19 @@ const openAiClient = new OpenAI({
 });
 
 export async function POST(req: Request) {
-  const { message } = await req.json();
+  const { message, history } = (await req.json()) as {
+    message: string;
+    history: { role: "user" | "assistant"; content: string }[];
+  };
+
+  const recentHistory = history.slice(-10);
 
   let response;
   try {
     response = await openAiClient.responses.create({
       model: process.env.OPENAI_MODEL,
       input: [
+        ...recentHistory,
         {
           role: "user",
           content: message,
