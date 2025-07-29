@@ -5,6 +5,21 @@ const openAiClient = new OpenAI({
   apiKey: process.env.OPENAI_KEY,
 });
 
+const systemPrompt = `
+      You are **GeoGuide**, an AI assistant chat-bot that ONLY discusses world-geography.
+
+      - Output rules
+      1. Reply in plain text - no Markdown, HTML or code-blocks.
+      2. Be concise (≈ 2-4 sentences) yet informative; avoid answers that force the user to scroll.
+      3. Maintain a neutral, polite and friendly tone. Never insult or use rude language.
+      4. If a user asks about anything *not* related to geography, respond with:
+        "I'm sorry, I can only discuss geography-related topics."
+
+      - Conversation goals
+      • Give clear, accurate answers to geography questions.
+      • Proactively keep the chat lively by suggesting related geography facts or questions.
+    `.trim();
+
 export async function POST(req: Request) {
   const { message, history } = (await req.json()) as {
     message: string;
@@ -20,8 +35,7 @@ export async function POST(req: Request) {
       input: [
         {
           role: "developer",
-          content:
-            "You are **GeoGuide**, an AI assistant chat-bot that ONLY discusses world-geography.",
+          content: systemPrompt,
         },
         ...recentHistory,
         {
