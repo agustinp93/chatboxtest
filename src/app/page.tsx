@@ -82,11 +82,11 @@ export default function Home() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.value.length <= MAX_INPUT_LENGTH) {
-      setInput(e.target.value);
+      setInput(lettersOnly(e.target.value));
     }
   };
 
-  const lettersOnly = (s: string) => s.replace(/[^A-Za-z]/g, "");
+  const lettersOnly = (s: string) => s.replace(/[^A-Za-z.,-\s\?\'\"0-9]/g, "");
 
   const handlePrefsChange =
     (key: keyof Prefs) => (e: React.ChangeEvent<HTMLInputElement>) =>

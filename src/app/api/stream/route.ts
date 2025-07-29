@@ -1,6 +1,29 @@
 export const runtime = "edge";
 import OpenAI from "openai";
 
+if (!process.env.OPENAI_KEY || !process.env.OPENAI_MODEL) {
+  throw new Error("Missing OPENAI_KEY or OPENAI_MODEL env vars");
+}
+
+const MAX_MESSAGE_LENGTH = 1000;
+
+interface ChatHistory {
+  role: "user" | "assistant";
+  content: string;
+}
+
+interface UserPrefs {
+  country: string;
+  continent: string;
+  destination: string;
+}
+
+interface RequestBody {
+  message: string;
+  history: ChatHistory[];
+  prefs: UserPrefs;
+}
+
 const openAiClient = new OpenAI({
   apiKey: process.env.OPENAI_KEY,
 });
@@ -28,16 +51,72 @@ const getGeoGuidePrompt = function getGeoGuidePrompt(prefs: {
         • Favourite country: ${prefs.country || "-"}
         • Favourite continent: ${prefs.continent || "-"}
         • Favourite destination: ${prefs.destination || "-"}
-      If any of the user preferences is not present, please ask the user for more information.
+      If any of the user preferences is not present, please ask the user for more information. 
+
+      Max lenght response: ${MAX_MESSAGE_LENGTH} characters.
     `.trim();
 };
 
+function isValidRequest(body: unknown): body is RequestBody {
+  if (!body || typeof body !== "object") {
+    return false;
+  }
+
+  const { message, history, prefs } = body as RequestBody;
+
+  // Validate message
+  if (
+    typeof message !== "string" ||
+    message.trim().length === 0 ||
+    message.length > MAX_MESSAGE_LENGTH
+  ) {
+    return false;
+  }
+
+  // Validate history
+  if (
+    !Array.isArray(history) ||
+    history.some(
+      (item) =>
+        typeof item !== "object" ||
+        !["user", "assistant"].includes(item.role) ||
+        typeof item.content !== "string" ||
+        item.content.length > MAX_MESSAGE_LENGTH
+    )
+  ) {
+    return false;
+  }
+
+  // Validate prefs
+  if (!prefs || typeof prefs !== "object") {
+    return false;
+  }
+
+  const { country, continent, destination } = prefs;
+  if (
+    (country !== undefined && typeof country !== "string") ||
+    (continent !== undefined && typeof continent !== "string") ||
+    (destination !== undefined && typeof destination !== "string")
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 export async function POST(req: Request) {
-  const { message, history, prefs } = (await req.json()) as {
-    message: string;
-    history: { role: "user" | "assistant"; content: string }[];
-    prefs: { country: string; continent: string; destination: string };
-  };
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return new Response("Invalid JSON", { status: 400 });
+  }
+
+  if (!isValidRequest(body)) {
+    return new Response("Invalid request body", { status: 400 });
+  }
+
+  const { message, history, prefs } = body;
 
   const recentHistory = history.slice(-10);
 
