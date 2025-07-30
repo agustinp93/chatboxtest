@@ -1,22 +1,6 @@
 export const runtime = "edge";
-// import OpenAI from "openai";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import OpenAI from "openai";
 
-/* ------------------------------------------------------------------
- * Gemini client setup
- * ----------------------------------------------------------------*/
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_API_MODEL = process.env.GEMINI_API_MODEL || "";
-
-const geminiClient = new ChatGoogleGenerativeAI({
-  apiKey: GEMINI_API_KEY,
-  model: GEMINI_API_MODEL,
-  temperature: 0.5,
-});
-
-/* ------------------------------------------------------------------
- * OpenAI env validation (keep as-is)
- * ----------------------------------------------------------------*/
 if (!process.env.OPENAI_KEY || !process.env.OPENAI_MODEL) {
   throw new Error("Missing OPENAI_KEY or OPENAI_MODEL env vars");
 }
@@ -26,8 +10,7 @@ const MAX_MESSAGE_LENGTH = 1000;
 type ChatMode = "story" | "quiz" | "funfact";
 
 interface ChatHistory {
-  role: "user" | "assistant" | "system";
-  type: "user" | "assistant" | "system";
+  role: "user" | "assistant";
   content: string;
 }
 
@@ -45,9 +28,9 @@ interface RequestBody {
   config?: ChatMode; // "story" | "quiz" | "funfact"
 }
 
-// const openAiClient = new OpenAI({
-//   apiKey: process.env.OPENAI_KEY,
-// });
+const openAiClient = new OpenAI({
+  apiKey: process.env.OPENAI_KEY,
+});
 
 const basePersona = `You are **GeoGuide**, an AI assistant chat-bot that ONLY discusses world-geography.`;
 
@@ -186,60 +169,25 @@ export async function POST(req: Request) {
 
   let response;
   try {
-    // response = await openAiClient.responses.create({
-    //   model: process.env.OPENAI_MODEL,
-    //   input: [
-    //     {
-    //       role: "developer",
-    //       content: buildSystemPrompt(config, prefs),
-    //     },
-    //     ...recentHistory,
-    //     {
-    //       role: "user",
-    //       content: message,
-    //     },
-    //   ],
-    // });
-
-    const formattedHistory = recentHistory
-      .filter((item) => item.role === "user" || item.role === "assistant")
-      .map((item) => ({
-        role: item.role as "user" | "assistant",
-        content: item.content,
-      }));
-
-    response = await geminiClient.invoke([
-      {
-        role: "system",
-        content: buildSystemPrompt(config, prefs),
-      },
-      ...formattedHistory,
-      {
-        role: "user",
-        content: message,
-      },
-    ]);
+    response = await openAiClient.responses.create({
+      model: process.env.OPENAI_MODEL,
+      input: [
+        {
+          role: "developer",
+          content: buildSystemPrompt(config, prefs),
+        },
+        ...recentHistory,
+        {
+          role: "user",
+          content: message,
+        },
+      ],
+    });
   } catch (err) {
     const msg = (err as Error).message ?? "OpenAI error";
     return new Response(msg, { status: 502 });
   }
-
-  let assistantResponse: string;
-  if (typeof response.content === "string") {
-    assistantResponse = response.content;
-  } else if (
-    typeof response.content === "object" &&
-    response.content !== null &&
-    "text" in response.content
-  ) {
-    assistantResponse = (response.content as { text: string }).text;
-  } else {
-    return new Response("Invalid response format from Gemini API", {
-      status: 500,
-    });
-  }
-
-  console.log("Gemini Response---- ", assistantResponse);
+  const assistantResponse = response.output_text;
 
   const encoder = new TextEncoder();
 
