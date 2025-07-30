@@ -1,6 +1,8 @@
 "use client";
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Loader2, Pencil, BookOpen, HelpCircle, Sparkles } from "lucide-react";
+import { Loader2, BookOpen, HelpCircle, Sparkles } from "lucide-react";
+import MessageList from "@/components/chat/MessageList";
+import ChatHeader from "@/components/chat/ChatHeader";
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -41,6 +43,7 @@ export default function Home() {
   const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const [showPrefs, setShowPrefs] = useState(true);
   const [prefs, setPrefs] = useState<Prefs>({
@@ -60,6 +63,10 @@ export default function Home() {
       !!mode
     );
   }, [prefs, mode]);
+
+  const modeLabel = useMemo(() => {
+    return MODES.find((m) => m.key === mode)?.label || "";
+  }, [mode]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -223,39 +230,21 @@ export default function Home() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 w-80 h-96 flex flex-col rounded-lg shadow-lg border bg-white dark:bg-gray-900">
-      <div className="flex items-center justify-between px-3 py-2 border-b">
-        <span className="text-sm font-medium">
-          Geo‑Chat{" "}
-          <span className="opacity-60">
-            • {MODES.find((m) => m.key === mode)?.label}
-          </span>
-        </span>
-        <button
-          onClick={() => setShowPrefs(true)}
-          disabled={loading}
-          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-          title="Edit preferences"
-        >
-          <Pencil size={16} className="stroke-2" />
-        </button>
-      </div>
+    <div
+      className={`fixed bottom-6 right-6 ${
+        isExpanded ? "w-[480px] h-[600px]" : "w-80 h-96"
+      } flex flex-col rounded-lg shadow-lg border bg-white dark:bg-gray-900 transition-all duration-300`}
+    >
+      <ChatHeader
+        modeLabel={modeLabel}
+        loading={loading}
+        editing={showPrefs}
+        onEditPrefs={() => setShowPrefs(true)}
+        isExpanded={isExpanded}
+        toggleExpanded={() => setIsExpanded((prev) => !prev)}
+      />
 
-      <div className="flex-1 p-3 overflow-y-auto space-y-2 text-sm">
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`max-w-[75%] break-words rounded-md px-3 py-1 ${
-              m.role === "user"
-                ? "self-end bg-blue-600 text-white"
-                : "self-start bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-50"
-            }`}
-          >
-            {m.content}
-          </div>
-        ))}
-        <div ref={endRef} />
-      </div>
+      <MessageList messages={messages} endRef={endRef} />
 
       <div className="p-3 flex gap-2">
         <input
