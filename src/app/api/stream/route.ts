@@ -224,9 +224,6 @@ export async function POST(req: Request) {
     return new Response(msg, { status: 502 });
   }
 
-  /* ----------------------------------------------------------------
-   * Normalise Gemini response
-   * --------------------------------------------------------------*/
   let assistantResponse: string;
   if (typeof response.content === "string") {
     assistantResponse = response.content;

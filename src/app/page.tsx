@@ -44,10 +44,10 @@ export default function Home() {
 
   const [showPrefs, setShowPrefs] = useState(true);
   const [prefs, setPrefs] = useState<Prefs>({
-    name: "",
-    country: "",
-    continent: "",
-    destination: "",
+    name: "Agustin",
+    country: "England",
+    continent: "Europe",
+    destination: "London",
   });
   const [mode, setMode] = useState<ModeKey | "">("");
 
@@ -65,12 +65,17 @@ export default function Home() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function send() {
-    if (!input.trim() || loading) return;
+  async function send(messageOverride?: string, isSystemMessage = false) {
+    const msg = messageOverride ?? input.trim();
+    console.log("Message", msg);
+    if (!msg || loading) return;
 
-    const userMessage: Message = { role: "user", content: input.trim() };
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
+    const userMessage: Message = { role: "user", content: msg };
+    if (!isSystemMessage) {
+      setMessages((prev) => [...prev, userMessage]);
+      setInput("");
+    }
+
     setLoading(true);
 
     try {
@@ -78,15 +83,14 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: userMessage.content,
+          message: msg,
           history: messages.slice(-10),
           prefs,
           config: mode,
         }),
       });
 
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
-      if (!res.body) throw new Error("No response body");
+      if (!res.ok || !res.body) throw new Error("API error");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -97,21 +101,24 @@ export default function Home() {
         const { value, done } = await reader.read();
         if (done) break;
         aiAssistant += decoder.decode(value);
+
         setMessages((prev) => {
           const copy = [...prev];
           copy[copy.length - 1] = { role: "assistant", content: aiAssistant };
           return copy;
         });
       }
-    } catch (error) {
-      console.error(error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "Sorry, something went wrong. Please try again.",
-        },
-      ]);
+    } catch (err) {
+      console.error(err);
+      if (!isSystemMessage) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "Sorry, something went wrong. Please try again.",
+          },
+        ]);
+      }
     } finally {
       setLoading(false);
     }
@@ -128,9 +135,11 @@ export default function Home() {
     (key: keyof Prefs) => (e: React.ChangeEvent<HTMLInputElement>) =>
       setPrefs((p) => ({ ...p, [key]: lettersOnly(e.target.value) }));
 
-  /* ------------------------------------------------------------------
-   * Render onboarding overlay
-   * ----------------------------------------------------------------*/
+  const onboadingCompleted = () => {
+    setShowPrefs(false);
+    send("Greet the user", true);
+  };
+
   if (showPrefs || !onboardingComplete) {
     return (
       <div className="fixed bottom-6 right-6 w-80 rounded-xl shadow-lg border bg-white dark:bg-gray-900 p-4 space-y-4 text-sm">
@@ -164,13 +173,15 @@ export default function Home() {
           className="w-full border rounded p-2"
           value={prefs.destination}
           onChange={handlePrefsChange("destination")}
-          disabled={loading}
+          disabled={loading || !onboardingComplete}
           onKeyDown={(e) =>
-            e.key === "Enter" && onboardingComplete && setShowPrefs(false)
+            e.key === "Enter" &&
+            !loading &&
+            onboardingComplete &&
+            onboadingCompleted()
           }
         />
 
-        {/* Creative mode picker */}
         <div className="pt-2">
           <p className="mb-1 font-medium">Choose your vibe:</p>
           <div className="grid grid-cols-3 gap-2">
@@ -199,7 +210,11 @@ export default function Home() {
         <button
           disabled={!onboardingComplete || loading}
           className="w-full py-2 rounded bg-blue-600 text-white disabled:opacity-50"
-          onClick={() => !loading && setShowPrefs(false)}
+          onClick={() => {
+            if (!loading && onboardingComplete) {
+              onboadingCompleted();
+            }
+          }}
         >
           Let&rsquo;s chat!
         </button>
@@ -252,7 +267,7 @@ export default function Home() {
           disabled={loading}
         />
         <button
-          onClick={send}
+          onClick={() => send()}
           disabled={loading || !input.trim()}
           className="px-3 py-1 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700"
         >
