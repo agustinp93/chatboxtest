@@ -1,35 +1,25 @@
+"use client";
 import { Loader2 } from "lucide-react";
-import Button from "../ui/Button";
+import Button from "@/components/ui/Button";
+import { useChat } from "@/context/ChatContext";
 
-interface ChatInputProps {
-  input: string;
-  disabled: boolean;
-  loading: boolean;
-  onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onSubmit: () => void;
-}
+export default function ChatInput() {
+  const { input, loading, handleInputChange, send } = useChat();
 
-const ChatInput: React.FC<ChatInputProps> = ({
-  input,
-  disabled,
-  loading,
-  onInputChange,
-  onSubmit,
-}) => {
   return (
     <div className="p-3 flex gap-2 border-t bg-white dark:bg-gray-900">
       <input
         value={input}
-        onChange={onInputChange}
-        onKeyDown={(e) => e.key === "Enter" && onSubmit()}
+        onChange={handleInputChange}
+        onKeyDown={(e) => e.key === "Enter" && send()}
         className="w-[80%] rounded-md border px-2 py-1 text-sm bg-transparent outline-none"
         placeholder="Type a message"
-        disabled={disabled}
+        disabled={loading}
       />
       <div className="w-[20%] flex items-center justify-center">
         <Button
-          onClick={onSubmit}
-          disabled={disabled || !input.trim()}
+          onClick={() => send()}
+          disabled={loading || !input.trim()}
           className="w-full h-full flex items-center justify-center"
         >
           {loading ? <Loader2 size={16} className="animate-spin" /> : "Send"}
@@ -37,6 +27,4 @@ const ChatInput: React.FC<ChatInputProps> = ({
       </div>
     </div>
   );
-};
-
-export default ChatInput;
+}

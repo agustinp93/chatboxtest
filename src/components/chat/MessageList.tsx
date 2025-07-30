@@ -1,16 +1,8 @@
-import React, { RefObject } from "react";
+import { useChat } from "@/context/ChatContext";
+import React from "react";
 
-type Message = {
-  role: "user" | "assistant";
-  content: string;
-};
-
-interface MessageListProps {
-  messages: Message[];
-  endRef: RefObject<HTMLDivElement | null>;
-}
-
-const MessageList: React.FC<MessageListProps> = ({ messages, endRef }) => {
+export default function MessageList() {
+  const { messages, endRef } = useChat();
   return (
     <div className="flex-1 p-3 overflow-y-auto space-y-2 text-sm bg-[#1A2E25]">
       {messages.map((m, i) => {
@@ -35,6 +27,4 @@ const MessageList: React.FC<MessageListProps> = ({ messages, endRef }) => {
       <div ref={endRef} />
     </div>
   );
-};
-
-export default MessageList;
+}

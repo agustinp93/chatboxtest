@@ -1,27 +1,23 @@
+"use client";
 import { Pencil, Maximize2, Minimize2 } from "lucide-react";
+import { useChat } from "@/context/ChatContext";
 
-interface ChatHeaderProps {
-  modeLabel: string;
-  loading: boolean;
-  editing: boolean;
-  onEditPrefs: () => void;
-  isExpanded: boolean;
-  toggleExpanded: () => void;
-}
+export default function ChatHeader() {
+  const {
+    loading,
+    showPrefs,
+    setShowPrefs,
+    isExpanded,
+    toggleExpanded,
+    modeLabel,
+  } = useChat();
 
-const ChatHeader: React.FC<ChatHeaderProps> = ({
-  modeLabel,
-  loading,
-  onEditPrefs,
-  editing,
-  isExpanded,
-  toggleExpanded,
-}) => {
   return (
     <div className="flex items-center justify-between px-3 py-2 border-b bg-[#1A2E25] text-white">
       <span className="text-sm font-medium">
-        Geo‑Chat <span className="opacity-60">• {modeLabel}</span>
+        Geo-Chat <span className="opacity-60">• {modeLabel}</span>
       </span>
+
       <div className="flex items-center gap-2">
         <button
           onClick={toggleExpanded}
@@ -30,9 +26,10 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
         >
           {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
         </button>
-        {!editing && (
+
+        {!showPrefs && (
           <button
-            onClick={onEditPrefs}
+            onClick={() => setShowPrefs(true)}
             disabled={loading}
             className="p-1 rounded hover:bg-[#2E4A3B]"
             title="Edit preferences"
@@ -43,6 +40,4 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
       </div>
     </div>
   );
-};
-
-export default ChatHeader;
+}
